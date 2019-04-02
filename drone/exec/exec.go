@@ -7,7 +7,10 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"path/filepath"
+	goruntime "runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/drone/envsubst"
@@ -266,7 +269,7 @@ func exec(c *cli.Context) error {
 	if c.Bool("clone") == false {
 		pwd, _ := os.Getwd()
 		comp.WorkspaceMountFunc = compiler.MountHostWorkspace
-		comp.WorkspaceFunc = compiler.CreateHostWorkspace(pwd)
+		comp.WorkspaceFunc = compiler.CreateHostWorkspace(unixPath(pwd))
 	}
 	comp.TransformFunc = transform.Combine(transforms...)
 	ir := comp.Compile(pipeline)
@@ -324,6 +327,21 @@ func exec(c *cli.Context) error {
 		runtime.WithConfig(ir),
 		runtime.WithHooks(hooks),
 	).Run(ctx)
+}
+
+func unixPath(path string) string {
+	if goruntime.GOOS != "windows" {
+		return path
+	}
+
+	base := filepath.VolumeName(path)
+	if len(base) == 2 {
+		path = strings.TrimPrefix(path, base)
+		base = strings.ToLower(strings.TrimSuffix(base, ":"))
+		return "/" + base + filepath.ToSlash(path)
+	}
+
+	return filepath.ToSlash(path)
 }
 
 // helper function converts a slice of urls to a slice
